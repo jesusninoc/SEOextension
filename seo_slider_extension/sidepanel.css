@@ -127,3 +127,25 @@ button:hover { filter: brightness(1.05); }
 }
 .small-link { color: #b8c7ff; text-decoration: none; }
 .small-link:hover { text-decoration: underline; }
+/* Añade esto al final de tu sidepanel.css */
+.item-head h3 {
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 12px;
+}
+
+/* Estilo para el preview de Google */
+.serp-box {
+    background: white !important;
+    border-radius: 8px !important;
+    padding: 15px !important;
+    border-left: 5px solid #4285f4 !important;
+}
+
+/* Efecto al pasar el ratón por los items */
+.item:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease;
+    border-color: var(--manual);
+}
