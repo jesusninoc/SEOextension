@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SEO Slider Auditor</title>
+  <title>SEO Slider Auditor Pro</title>
   <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
   <div class="app">
     <header class="hero">
       <div>
-        <h1>SEO Slider Auditor</h1>
-        <p>Revisión visual de una URL con checks automáticos, heurísticos y manuales.</p>
+        <h1>🚀 SEO Auditor Pro</h1>
+        <p>Auditoría completa: SEO, accesibilidad, técnico y rendimiento.</p>
       </div>
       <div class="score-card">
         <div class="score-label">Puntuación</div>
@@ -24,22 +24,47 @@
       <label for="urlInput">URL a analizar</label>
       <div class="row">
         <input id="urlInput" type="url" placeholder="https://tusitio.com" value="https://example.com">
-        <button id="analyzeBtn">Analizar</button>
+        <button id="analyzeBtn" class="btn-primary">Analizar</button>
       </div>
       <div id="status" class="status">Introduce una URL y pulsa Analizar.</div>
     </section>
 
+    <section class="toolbar">
+      <div class="filter-group">
+        <button class="filter-btn active" data-filter="all">📊 Todos</button>
+        <button class="filter-btn" data-filter="seo">🔍 SEO</button>
+        <button class="filter-btn" data-filter="accessibility">♿ Accesibilidad</button>
+        <button class="filter-btn" data-filter="technical">⚙️ Técnico</button>
+        <button class="filter-btn" data-filter="performance">⚡ Rendimiento</button>
+      </div>
+      <div class="action-group">
+        <button id="exportBtn" class="btn-secondary" title="Exportar como JSON">📥 Exportar</button>
+        <button id="historyBtn" class="btn-secondary" title="Ver historial">📋 Historial</button>
+      </div>
+    </section>
+
     <section class="legend">
-      <span class="badge ok">Automático</span>
-      <span class="badge warn">Heurístico</span>
-      <span class="badge manual">Manual</span>
+      <span class="badge ok">✓ Automático</span>
+      <span class="badge warn">⚠ Heurístico</span>
+      <span class="badge manual">ℹ Manual</span>
     </section>
 
     <section id="results" class="results"></section>
+
+    <!-- Modal de Historial -->
+    <div id="historyModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>📋 Historial de Análisis</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+        <div class="modal-footer">
+          <button id="clearHistoryBtn" class="btn-danger">Limpiar historial</button>
+        </div>
+      </div>
+    </div>
   </div>
-  <button id="copyReport" style="width: 100%; margin-top: 20px; background: #20316b;">
-      Copiar Informe al Portapapeles
-  </button>
   <script src="sidepanel.js"></script>
 </body>
 </html>
