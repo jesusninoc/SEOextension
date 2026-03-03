@@ -1,3 +1,5 @@
+RICARDO MATOS EL MEJOR ALUMNO DE JESUS NINOC DEJO MI GITHUB POR SI QUEREIS CONTRATARME Y EMPEZAR A FACTURAR = github: https://github.com/RicardoMatosR 
+
 SEO Slider Auditor
 ==================
 
