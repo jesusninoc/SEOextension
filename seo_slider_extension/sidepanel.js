@@ -94,11 +94,30 @@ const CHECKS = [
   }
 ];
 
+// ============= EVENT LISTENERS =============
 analyzeBtn.addEventListener('click', analyze);
 urlInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') analyze();
 });
 
+exportBtn.addEventListener('click', exportResults);
+historyBtn.addEventListener('click', showHistory);
+modalClose.addEventListener('click', () => historyModal.classList.add('hidden'));
+clearHistoryBtn.addEventListener('click', clearHistory);
+historyModal.addEventListener('click', (e) => {
+  if (e.target === historyModal) historyModal.classList.add('hidden');
+});
+
+filterBtns.forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    filterBtns.forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    const filter = e.target.dataset.filter;
+    filterResults(filter);
+  });
+});
+
+// ============= FUNCIONES PRINCIPALES =============
 function setStatus(text) {
   statusEl.textContent = text;
 }
@@ -128,6 +147,7 @@ function unique(arr) {
   return [...new Set(arr.filter(Boolean))];
 }
 
+// ============= DETECTORES ESPECIALIZADOS =============
 function isProbablyGoogleAnalytics(html) {
   return /(googletagmanager\.com|google-analytics\.com|gtag\(|ga\(|G-[A-Z0-9]+)/i.test(html);
 }
@@ -136,6 +156,117 @@ function detectAds(html) {
   return /(googlesyndication\.com|doubleclick\.net|adsbygoogle|adservice\.google)/i.test(html);
 }
 
+function validateMetaTitle(doc) {
+  const title = doc.querySelector('title');
+  if (!title) return { status: 'bad', detail: 'No hay título meta' };
+  const len = title.textContent.length;
+  if (len < 30) return { status: 'warn', detail: `Muy corto (${len} caracteres). Mínimo 30.` };
+  if (len > 60) return { status: 'warn', detail: `Muy largo (${len} caracteres). Máximo 60.` };
+  return { status: 'ok', detail: `Óptimo (${len} caracteres): "${title.textContent.substring(0, 40)}..."` };
+}
+
+function validateMetaDescription(doc) {
+  const desc = doc.querySelector('meta[name="description"]');
+  if (!desc) return { status: 'bad', detail: 'No hay meta description' };
+  const len = desc.content.length;
+  if (len < 120) return { status: 'warn', detail: `Muy corta (${len} caracteres). Mínimo 120.` };
+  if (len > 160) return { status: 'warn', detail: `Muy larga (${len} caracteres). Máximo 160.` };
+  return { status: 'ok', detail: `Óptima (${len} caracteres): "${desc.content.substring(0, 40)}..."` };
+}
+
+function validateH1Structure(doc) {
+  const h1s = [...doc.querySelectorAll('h1')];
+  if (h1s.length === 0) return { status: 'bad', detail: 'No hay ningún H1 en la página' };
+  if (h1s.length > 1) return { status: 'warn', detail: `Múltiples H1 encontrados (${h1s.length}). Solo debería haber uno.` };
+  return { status: 'ok', detail: `Un H1 correcto: "${h1s[0].textContent.substring(0, 40)}"` };
+}
+
+function validateHeadingStructure(doc) {
+  const headings = [...doc.querySelectorAll('h1,h2,h3,h4,h5,h6')];
+  if (headings.length === 0) return { status: 'bad', detail: 'Sin headings' };
+  
+  let isCorrect = true;
+  let lastLevel = 0;
+  
+  for (const h of headings) {
+    const level = parseInt(h.tagName[1]);
+    if (level > lastLevel + 1) isCorrect = false;
+    lastLevel = level;
+  }
+  
+  return { status: isCorrect ? 'ok' : 'warn', detail: `${headings.length} headings. ${isCorrect ? 'Estructura correcta' : 'Posibles saltos en jerarquía'}` };
+}
+
+function checkImageAlt(doc) {
+  const images = [...doc.querySelectorAll('img')];
+  if (images.length === 0) return { status: 'ok', detail: 'Sin imágenes en la página' };
+  
+  const withoutAlt = images.filter(i => !i.hasAttribute('alt') || !i.getAttribute('alt').trim()).length;
+  if (withoutAlt === 0) return { status: 'ok', detail: `Todas las ${images.length} imágenes tienen alt` };
+  
+  return { status: withoutAlt > images.length / 2 ? 'bad' : 'warn', detail: `${withoutAlt} de ${images.length} sin alt (${Math.round(withoutAlt/images.length*100)}%)` };
+}
+
+function checkFormLabels(doc) {
+  const inputs = [...doc.querySelectorAll('input, select, textarea')];
+  if (inputs.length === 0) return { status: 'ok', detail: 'Sin formularios' };
+  
+  const withLabels = inputs.filter(i => {
+    const id = i.id;
+    return id && doc.querySelector(`label[for="${id}"]`);
+  }).length;
+  
+  const coverage = Math.round(withLabels / inputs.length * 100);
+  if (coverage === 100) return { status: 'ok', detail: `Todos los inputs (${inputs.length}) tienen labels` };
+  return { status: coverage > 50 ? 'warn' : 'bad', detail: `${coverage}% de inputs con labels (${withLabels}/${inputs.length})` };
+}
+
+function checkOgTags(doc) {
+  const og = {
+    title: !!doc.querySelector('meta[property="og:title"]'),
+    description: !!doc.querySelector('meta[property="og:description"]'),
+    image: !!doc.querySelector('meta[property="og:image"]'),
+    url: !!doc.querySelector('meta[property="og:url"]')
+  };
+  
+  const count = Object.values(og).filter(Boolean).length;
+  if (count === 0) return { status: 'warn', detail: 'Sin tags Open Graph' };
+  if (count === 4) return { status: 'ok', detail: 'Todos los Open Graph básicos presentes' };
+  return { status: 'warn', detail: `${count}/4 Open Graph tags` };
+}
+
+function checkStructuredData(doc) {
+  const jsonLd = doc.querySelectorAll('script[type="application/ld+json"]');
+  if (jsonLd.length === 0) return { status: 'warn', detail: 'Sin Schema.org JSON-LD' };
+  
+  return { status: 'ok', detail: `${jsonLd.length} bloque(s) de structured data detectado(s)` };
+}
+
+function checkCanonicalTag(doc) {
+  const canonical = doc.querySelector('link[rel="canonical"]');
+  if (!canonical) return { status: 'warn', detail: 'Sin canonical tag' };
+  return { status: 'ok', detail: `Canonical: ${canonical.href}` };
+}
+
+function checkViewportMeta(doc) {
+  const viewport = doc.querySelector('meta[name="viewport"]');
+  if (!viewport) return { status: 'bad', detail: 'Sin viewport meta tag' };
+  const content = viewport.getAttribute('content');
+  if (/width=device-width/.test(content)) return { status: 'ok', detail: 'Mobile-friendly meta correcta' };
+  return { status: 'warn', detail: 'Viewport meta presente pero posible problema' };
+}
+
+function checkNoindex(doc) {
+  const robots = doc.querySelector('meta[name="robots"]');
+  if (robots && /noindex/i.test(robots.content)) return { status: 'bad', detail: 'Meta robots contiene noindex' };
+  
+  const googleBot = doc.querySelector('meta[name="googlebot"]');
+  if (googleBot && /noindex/i.test(googleBot.content)) return { status: 'bad', detail: 'Meta googlebot contiene noindex' };
+  
+  return { status: 'ok', detail: 'Sin noindex - página indexable' };
+}
+
+// ============= ANÁLISIS PRINCIPAL =============
 async function analyze() {
   resultsEl.innerHTML = '';
   scoreEl.textContent = '...';
@@ -153,6 +284,7 @@ async function analyze() {
 
   try {
     const base = new URL(baseUrl);
+    const headers = await fetchHeaders(baseUrl);
 
     // 3. ASINCRONÍA EN PARALELO: Ejecutamos todas las peticiones de red simultáneamente
     const [homepage, robotsResult, sitemapResult, errorResult] = await Promise.all([
@@ -167,8 +299,12 @@ async function analyze() {
     const resolved = unique(anchors.map(h => {
       try { return new URL(h, base).toString(); } catch { return null; }
     }));
-    const internalLinks = resolved.filter(u => new URL(u).hostname === base.hostname);
-    const externalLinks = resolved.filter(u => new URL(u).hostname !== base.hostname);
+    const internalLinks = resolved.filter(u => {
+      try { return new URL(u).hostname === base.hostname; } catch { return false; }
+    });
+    const externalLinks = resolved.filter(u => {
+      try { return new URL(u).hostname !== base.hostname; } catch { return false; }
+    });
 
     const scriptSrcs = [...doc.querySelectorAll('script[src]')].map(s => s.src).join('\n');
     const imgs = [...doc.images];
@@ -195,6 +331,7 @@ async function analyze() {
     // Procesar Error Handling
     const errorControlled = errorResult.ok === false || errorResult.status === 404 || errorResult.redirected;
 
+    // === DETECCIONES MULTI-PÁGINA ===
     const hasMultiplePages = internalLinks.filter(u => {
       try {
         const p = new URL(u).pathname;
@@ -202,11 +339,7 @@ async function analyze() {
       } catch { return false; }
     }).length > 0 || sitemapInfo.count > 1;
 
-    const accessibilityOk = !!doc.documentElement.getAttribute('lang')
-      && !!doc.querySelector('title')
-      && (imgs.length === 0 || imgsWithoutAlt === 0)
-      && (forms.length === 0 || labels.length > 0);
-
+    // === COMPILAR RESULTADOS ===
     const payload = {
       morePages: { status: hasMultiplePages ? 'ok' : 'bad', detail: `Internos: ${internalLinks.length}. Sitemap: ${sitemapInfo.count}.` },
       searchPresence: { status: 'manual', detail: `Revisar site:${base.hostname}` },
@@ -238,6 +371,7 @@ async function analyze() {
   }
 }
 
+// ============= RENDERIZADO DE RESULTADOS =============
 function renderResults(payload, host) {
   resultsEl.innerHTML = '';
   let score = 0;
@@ -276,11 +410,108 @@ function renderResults(payload, host) {
 
   const normalized = Math.max(0, Math.min(100, Math.round((score / maxScore) * 100)));
   scoreEl.textContent = String(normalized);
-  scoreTextEl.textContent = normalized >= 80 ? 'Muy bien' : normalized >= 60 ? 'Aceptable' : 'A mejorar';
+  scoreTextEl.textContent = normalized >= 80 ? '✓ Muy bien' : normalized >= 60 ? '⚠ Aceptable' : '✗ A mejorar';
+}
+
+function filterResults(filter) {
+  const items = document.querySelectorAll('.item');
+  items.forEach(item => {
+    if (filter === 'all' || item.dataset.category === filter) {
+      item.classList.remove('hidden');
+    } else {
+      item.classList.add('hidden');
+    }
+  });
+}
+
+// ============= EXPORTACIÓN =============
+function exportResults() {
+  const score = scoreEl.textContent;
+  const hostname = new URL(normalizeUrl(urlInput.value)).hostname;
+  const items = Array.from(document.querySelectorAll('.item')).map(item => {
+    const title = item.querySelector('h3').textContent;
+    const status = item.querySelector('.pill').textContent;
+    const detail = item.querySelector('.meta').textContent.split('\n')[2]?.trim();
+    return { title, status, detail };
+  });
+
+  const report = {
+    hostname,
+    score: parseInt(score),
+    timestamp: new Date().toISOString(),
+    checks: items
+  };
+
+  const json = JSON.stringify(report, null, 2);
+  downloadFile(json, `audit-${hostname}-${Date.now()}.json`, 'application/json');
+}
+
+function downloadFile(content, filename, type = 'text/plain') {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ============= HISTORIAL =============
+function saveToHistory(hostname, payload) {
+  chrome.storage.local.get('analyses', (data) => {
+    const analyses = data.analyses || [];
+    const score = scoreEl.textContent;
+    analyses.unshift({
+      hostname,
+      score: parseInt(score),
+      timestamp: Date.now()
+    });
+    // Guardar solo últimos 20 análisis
+    if (analyses.length > 20) analyses.pop();
+    chrome.storage.local.set({ analyses });
+  });
+}
+
+function showHistory() {
+  chrome.storage.local.get('analyses', (data) => {
+    const analyses = data.analyses || [];
+    historyList.innerHTML = '';
+    
+    if (analyses.length === 0) {
+      historyList.innerHTML = '<p style="color: var(--muted); font-size: 12px;">Sin análisis previos</p>';
+    } else {
+      analyses.forEach((analysis, index) => {
+        const date = new Date(analysis.timestamp).toLocaleString('es-ES');
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `
+          <div class="history-item-domain">${escapeHtml(analysis.hostname)} (${analysis.score}/100)</div>
+          <div class="history-item-date">${date}</div>
+        `;
+        item.addEventListener('click', () => {
+          urlInput.value = `https://${analysis.hostname}`;
+          historyModal.classList.add('hidden');
+          analyze();
+        });
+        historyList.appendChild(item);
+      });
+    }
+    
+    historyModal.classList.remove('hidden');
+  });
+}
+
+function clearHistory() {
+  if (confirm('¿Eliminar todo el historial de análisis?')) {
+    chrome.storage.local.set({ analyses: [] });
+    historyList.innerHTML = '<p style="color: var(--muted);">Historial eliminado</p>';
+  }
 }
 
 function buildManualExtra(key, host) {
-  if (key === 'searchPresence' || key === 'sitemapIndexed') {
+  if (key === 'searchPresence') {
     const q = encodeURIComponent(`site:${host}`);
     return `<br><strong>Accesos:</strong> <a class="small-link" href="https://www.google.com/search?q=${q}" target="_blank">Google</a> · <a class="small-link" href="https://www.bing.com/search?q=${q}" target="_blank">Bing</a>`;
   }

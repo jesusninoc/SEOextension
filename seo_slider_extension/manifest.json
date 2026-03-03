@@ -16,7 +16,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "SEO Slider Auditor"
+    "default_title": "SEO Slider Auditor Pro"
   },
   "side_panel": {
     "default_path": "sidepanel.html"
